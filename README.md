@@ -75,7 +75,7 @@ set(ONDEWO_LIBRARY_NAME ondewo_sip_client CACHE STRING "" FORCE)
 FetchContent_Declare(
   ondewo_sip_client
   GIT_REPOSITORY https://github.com/ondewo/ondewo-sip-client-cpp.git
-  GIT_TAG        0.1.0)
+  GIT_TAG        5.4.0)
 FetchContent_MakeAvailable(ondewo_sip_client)
 
 # Note the UNqualified target name: the `ondewo::` namespace is created by the install/export step

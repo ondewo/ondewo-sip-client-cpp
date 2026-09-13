@@ -2,7 +2,7 @@
 
 *****************
 
-## Release ONDEWO SIP C++ Client 0.1.0
+## Release ONDEWO SIP C++ Client 5.4.0
 
 ### New Features
 
