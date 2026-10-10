@@ -4,14 +4,14 @@
 // the suite to another ONDEWO client means rewriting this file against that product's
 // messages and services. Everything generic lives in test_generated_stubs.cc.
 //
-// Two of the shapes the NLU suite carries have no counterpart here and are deliberately
-// absent rather than invented:
-//   - ondewo/sip/sip.proto declares no proto3 `optional` field, so there is no explicit-
-//     presence pair to assert (`grep -n "^[[:space:]]*optional " ondewo-sip-api/**/*.proto`
-//     comes back empty). The plain-scalar half of that pair is kept below: it is the wire
-//     contract that holds for every proto3 field SIP does declare.
-//   - the Sip service declares no streaming RPC at all (`grep -n "rpc .*stream"` is empty),
-//     so no ClientReader / ClientWriter / ClientReaderWriter type is generated to drive.
+// One of the shapes the NLU suite carries has no counterpart here and is deliberately absent
+// rather than invented: ondewo/sip/sip.proto declares no proto3 `optional` field, so there is
+// no explicit-presence pair to assert (`grep -n "^[[:space:]]*optional "
+// ondewo-sip-api/**/*.proto` comes back empty). The plain-scalar half of that pair is kept
+// below: it is the wire contract that holds for every proto3 field SIP does declare.
+//
+// The one streaming RPC, the bidirectional SipStreamCallAudio (API 5.5.0), is driven below
+// through its generated ClientReaderWriter.
 
 #include <chrono>
 #include <memory>
@@ -132,7 +132,7 @@ TEST(TypedApi, UnaryRpcAgainstADeadEndpointFailsCleanly) {
       << "unexpected status " << status.error_code() << ": " << status.error_message();
 }
 
-// Five of the eleven SIP RPCs take google.protobuf.Empty rather than a SIP message. That
+// Five of the fourteen SIP RPCs take google.protobuf.Empty rather than a SIP message. That
 // request type lives in libprotobuf, not in api/, so dispatching one proves the generated
 // service links against the well-known types as well as against its own.
 TEST(TypedApi, UnaryRpcWithAWellKnownRequestTypeFailsCleanly) {
@@ -147,6 +147,88 @@ TEST(TypedApi, UnaryRpcWithAWellKnownRequestTypeFailsCleanly) {
   const grpc::Status status = sip->SipGetSipStatus(&client_context, request, &response);
 
   EXPECT_FALSE(status.ok()) << "an RPC to a dead endpoint reported success";
+  EXPECT_TRUE(status.error_code() == grpc::StatusCode::UNAVAILABLE ||
+              status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED)
+      << "unexpected status " << status.error_code() << ": " << status.error_message();
+}
+
+// The call control of API 5.5.0: a call-scoped RPC carries the expected call id (and, for
+// media control, the call control token) as metadata. Against a dead endpoint the only
+// correct outcome is a transport failure, which proves the new request type, enums and
+// method descriptor link and dispatch.
+TEST(TypedApi, CallScopedMediaControlRpcAgainstADeadEndpointFailsCleanly) {
+  std::unique_ptr<ondewo::sip::Sip::Stub> sip = ondewo::sip::Sip::NewStub(DeadChannel());
+
+  grpc::ClientContext client_context;
+  client_context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
+  client_context.AddMetadata("x-ondewo-expected-call-id", "call-42");
+  client_context.AddMetadata("x-ondewo-sip-call-control-token", "token");
+
+  ondewo::sip::SipSetCallMediaControlRequest request;
+  request.set_bot_voice(ondewo::sip::MEDIA_CONTROL_SETTING_OFF);
+  request.set_bot_listening(ondewo::sip::MEDIA_CONTROL_SETTING_UNCHANGED);
+  request.set_owner(ondewo::sip::MEDIA_CONTROL_OWNER_OPERATOR);
+  ondewo::sip::SipStatus response;
+
+  const grpc::Status status = sip->SipSetCallMediaControl(&client_context, request, &response);
+
+  EXPECT_FALSE(status.ok()) << "an RPC to a dead endpoint reported success";
+  EXPECT_TRUE(status.error_code() == grpc::StatusCode::UNAVAILABLE ||
+              status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED)
+      << "unexpected status " << status.error_code() << ": " << status.error_message();
+}
+
+// The answering machine detection fields of API 5.5.0 survive the wire: the new status, the
+// call id and the nested result on SipStatus, and the end-call reason on SipEndCallRequest.
+TEST(TypedApi, AnsweringMachineDetectionFieldsSurviveSerializeAndParse) {
+  ondewo::sip::SipStatus original;
+  original.set_status_type(ondewo::sip::SipStatus::OUTGOING_CALL_ANSWERING_MACHINE_DETECTED);
+  original.set_call_id("call-42");
+  original.set_bot_muted(true);
+  original.mutable_amd_result()->set_call_id("call-42");
+
+  ondewo::sip::SipStatus parsed;
+  ASSERT_TRUE(parsed.ParseFromString(original.SerializeAsString()));
+  EXPECT_EQ(parsed.status_type(), ondewo::sip::SipStatus::OUTGOING_CALL_ANSWERING_MACHINE_DETECTED);
+  EXPECT_EQ(parsed.call_id(), "call-42");
+  EXPECT_TRUE(parsed.bot_muted());
+  ASSERT_TRUE(parsed.has_amd_result());
+  EXPECT_EQ(parsed.amd_result().call_id(), "call-42");
+
+  ondewo::sip::SipEndCallRequest end_call;
+  end_call.set_end_reason(ondewo::sip::SipEndCallRequest::ANSWERING_MACHINE);
+  ondewo::sip::SipEndCallRequest parsed_end_call;
+  ASSERT_TRUE(parsed_end_call.ParseFromString(end_call.SerializeAsString()));
+  EXPECT_EQ(parsed_end_call.end_reason(), ondewo::sip::SipEndCallRequest::ANSWERING_MACHINE);
+}
+
+// SipStreamCallAudio is bidirectional, so grpc_cpp_plugin generates a ClientReaderWriter for
+// it. Against a dead endpoint the stream must open, refuse to deliver a response and finish
+// with a transport failure - a crash or an OK would mean the generated stream is broken.
+TEST(TypedApi, BidirectionalStreamAgainstADeadEndpointFailsCleanly) {
+  std::unique_ptr<ondewo::sip::Sip::Stub> sip = ondewo::sip::Sip::NewStub(DeadChannel());
+
+  grpc::ClientContext client_context;
+  client_context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
+  client_context.AddMetadata("x-ondewo-expected-call-id", "call-42");
+
+  std::unique_ptr<grpc::ClientReaderWriter<ondewo::sip::SipCallAudioRequest,
+                                           ondewo::sip::SipCallAudioResponse>>
+      stream = sip->SipStreamCallAudio(&client_context);
+  ASSERT_NE(stream, nullptr);
+
+  ondewo::sip::SipCallAudioRequest request;
+  request.mutable_config()->set_mode(ondewo::sip::SIP_CALL_AUDIO_MODE_LISTEN);
+  request.mutable_config()->set_sample_rate_hz(8000);
+  request.mutable_config()->set_frame_ms(20);
+  stream->Write(request);
+  stream->WritesDone();
+
+  ondewo::sip::SipCallAudioResponse response;
+  EXPECT_FALSE(stream->Read(&response)) << "a stream to a dead endpoint delivered a response";
+
+  const grpc::Status status = stream->Finish();
+  EXPECT_FALSE(status.ok()) << "a stream to a dead endpoint reported success";
   EXPECT_TRUE(status.error_code() == grpc::StatusCode::UNAVAILABLE ||
               status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED)
       << "unexpected status " << status.error_code() << ": " << status.error_message();
