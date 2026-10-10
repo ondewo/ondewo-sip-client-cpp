@@ -36,11 +36,11 @@ files; the rest is copied verbatim.
   the two fails here.
 - Every generated enum declares `0` as its first value, as proto3 requires.
 - `FillScalarFields` handles every protobuf scalar type. No single product uses all of them —
-  the sip protos declare no `float` and no `uint64` — so the branches are pinned against
+  the sip protos declare no `double` and no `int64` — so the branches are pinned against
   `google.protobuf`'s wrapper types, which libprotobuf registers into the same pool. That is
   what lets `descriptor_probe.cc` be copied between products untouched.
-- `MessagesInFile` / `EnumsInFile` handle every *shape* a `.proto` can have. No single product
-  has all three — t2s declares no `map<>`, s2t no nested enum, sip no file-scope enum — so the
+- `MessagesInFile` / `EnumsInFile` handle every *shape* a `.proto` can have. Not every product
+  has all three — t2s declares no `map<>`, s2t no nested enum — so the
   branches are pinned against `google/protobuf/struct.proto` (a map entry plus a file-scope enum)
   and `google/protobuf/descriptor.proto` (enums nested inside messages), both of which libprotobuf
   registers into the same pool.
@@ -48,11 +48,12 @@ files; the rest is copied verbatim.
   `ondewo/sip/sip.proto` declares **no** `optional` field, so there is no explicit-presence
   counterpart to assert and none is invented — the presence pair the NLU suite carries is
   deliberately absent here.
-- Service stubs are constructed against a channel, and two unary RPCs are actually issued
-  against a dead endpoint — one with a SIP request type and one with `google.protobuf.Empty` —
-  and must come back as `UNAVAILABLE` / `DEADLINE_EXCEEDED`, which proves the stub, the
-  request/response types and the generated method descriptors all link and dispatch. The `Sip`
-  service declares no streaming RPC at all, so there is no stream type to drive.
+- Service stubs are constructed against a channel, and three unary RPCs are actually issued
+  against a dead endpoint — one with a SIP request type, one with `google.protobuf.Empty` and
+  the call-scoped `SipSetCallMediaControl` with its metadata — and must come back as
+  `UNAVAILABLE` / `DEADLINE_EXCEEDED`, which proves the stub, the request/response types and the
+  generated method descriptors all link and dispatch. The bidirectional `SipStreamCallAudio` is
+  driven the same way through its generated `ClientReaderWriter`.
 
 ## Notes on the build
 

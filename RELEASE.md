@@ -2,6 +2,40 @@
 
 *****************
 
+## Release ONDEWO SIP C++ Client 5.5.0
+
+### New Features
+
+* Tracks [ONDEWO SIP API 5.5.0](https://github.com/ondewo/ondewo-sip-api/releases/tag/5.5.0); the stubs in `api/`
+  are regenerated from it. New API surface (summarised from the API release notes, purely additive and
+  wire-compatible with 5.4.0):
+  * Answering machine detection: status `OUTGOING_CALL_ANSWERING_MACHINE_DETECTED`,
+    `AnsweringMachineDetectionResult` and `SipStatus.amd_result`, `SipEndCallRequest.end_reason` /
+    `SipEndCallRequest.amd_result`, and the in-container RPC `SipReportAnsweringMachineDetected`.
+  * Call identity: `SipStatus.call_id`; requests are scoped to a call with the `x-ondewo-expected-call-id` gRPC
+    metadatum.
+  * `SipSetCallMediaControl`: call-scoped operator / participant media control (`MediaControlSetting`,
+    `MediaControlOwner`), reported in `SipStatus.bot_muted` and `SipStatus.listening_paused`.
+  * `SipStreamCallAudio`: bidirectional live call audio (LISTEN / TALK), counted in
+    `SipStatus.call_audio_streams`. It is the first streaming RPC of the `Sip` service and is generated as a
+    `grpc::ClientReaderWriter`.
+  * Truthful transfers: `SipTransferCallRequest.outcome_timeout_ms`, `SipStatus.sip_response_code` and
+    `SipEndCallRequest.EndCallReason.END_CALL_REASON_TRANSFERRED`.
+  * `SipGetSipStatus` and `SipGetSipStatusHistory` declare `idempotency_level = NO_SIDE_EFFECTS` (the C++ channel
+    helper still configures no retry policy).
+
+### Improvements
+
+* The test suite covers the new surface: `tests/product_config.cc` expects the three new RPCs and raises the sweep
+  floors to the 5.5.0 counts (18 messages, 9 enums, 55 scalar fields); `tests/test_typed_api.cc` round-trips the
+  answering machine fields, dispatches `SipSetCallMediaControl` with its call-scope metadata and drives the
+  `SipStreamCallAudio` stream against a dead endpoint.
+* The pinned `ondewo-proto-compiler` submodule moves from 5.15.2 to 5.15.5 (its fixes concern the Python, Rust and
+  Node.js images; the C++ generation is unchanged).
+* Tracking API Version [5.5.0](https://github.com/ondewo/ondewo-sip-api/releases/tag/5.5.0) ( [Documentation](https://ondewo.github.io/ondewo-sip-api/) )
+
+*****************
+
 ## Release ONDEWO SIP C++ Client 5.4.1
 
 ### New Features

@@ -128,7 +128,7 @@ TEST(GeneratedStubs, EveryMessageRoundTripsThroughTheWireFormat) {
 }
 
 // FillScalarFields branches on the protobuf C++ type, and no single product uses every one
-// of them - the sip protos, for instance, declare no float and no uint64 at all. The
+// of them - the sip protos, for instance, declare no double and no int64 at all. The
 // branches are therefore pinned down here against google.protobuf's wrapper types, which
 // libprotobuf registers into this same generated pool and which carry exactly one field of
 // each scalar type. This is what keeps the helper honest for every ONDEWO product without

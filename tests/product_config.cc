@@ -28,27 +28,31 @@ const std::vector<ExpectedMethod> kExpectedMethods = {
     // ... the status RPCs, both taking google.protobuf.Empty rather than a SIP request ...
     {"ondewo.sip.Sip", "SipGetSipStatus"},
     {"ondewo.sip.Sip", "SipGetSipStatusHistory"},
-    // ... and the audio controls.
+    // ... the audio controls ...
     {"ondewo.sip.Sip", "SipPlayWavFiles"},
     {"ondewo.sip.Sip", "SipMute"},
     {"ondewo.sip.Sip", "SipUnMute"},
+    // ... and the call control of API 5.5.0: the in-container answering machine report, the
+    // call-scoped media control and the bidirectional live call audio stream.
+    {"ondewo.sip.Sip", "SipReportAnsweringMachineDetected"},
+    {"ondewo.sip.Sip", "SipSetCallMediaControl"},
+    {"ondewo.sip.Sip", "SipStreamCallAudio"},
 };
 
-// SipStatus is the response type of nine of the eleven RPCs and carries eight singular
-// strings plus the status enum.
+// SipStatus is the response type of twelve of the fourteen RPCs and carries singular
+// strings, booleans and integers plus the status enum.
 const std::string kScalarMessageFullName = "ondewo.sip.SipStatus";
 
-// SIP declares exactly one enum and it is nested inside SipStatus - a fully-qualified proto
+// The call status enum is nested inside SipStatus - a fully-qualified proto
 // name separates the nesting with '.', not with C++'s '::'.
 const std::string kEnumFullName = "ondewo.sip.SipStatus.StatusType";
 
-// ONDEWO SIP API 5.4.0 generates 8 messages (the three map<> entry types excluded), 1 enum
-// and 17 singular scalar fields across the file listed above. SIP is a deliberately small
-// API - there is no room to round these down, so the floors ARE the current counts and any
-// loss fails the sweep. A floor of 1 enum is the honest value here: sip.proto declares
-// exactly one, nested inside SipStatus.
-const int kMinimumMessageCount = 8;
-const int kMinimumEnumCount = 1;
-const int kMinimumScalarFieldCount = 17;
+// ONDEWO SIP API 5.5.0 generates 18 messages (the map<> entry types excluded), 9 enums and
+// 55 singular scalar fields across the file listed above (the sweep's own counts). SIP is a
+// deliberately small API - there is no room to round these down, so the floors ARE the
+// current counts and any loss fails the sweep.
+const int kMinimumMessageCount = 18;
+const int kMinimumEnumCount = 9;
+const int kMinimumScalarFieldCount = 55;
 
 }  // namespace ondewo_client_test
