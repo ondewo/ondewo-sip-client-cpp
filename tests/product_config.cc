@@ -2,14 +2,16 @@
 
 namespace ondewo_client_test {
 
-// Mirrors the #include list of the generated public-api.h, one .proto per pair of headers:
+// Every .proto of the generated umbrella header public-api.h, one per pair of headers. DERIVED at
+// configure time by tests/CMakeLists.txt - the equivalent of
 //   sed -n 's|^#include "\(.*\)\.pb\.h"$|\1|p' public-api.h | sed 's|\.grpc$||' | sort -u
+// - so an API release that adds a .proto needs no edit here.
 //
-// The ONDEWO SIP API is a single .proto file. Its imports (google/protobuf/empty.proto,
+// The ONDEWO SIP API is a single .proto file today. Its imports (google/protobuf/empty.proto,
 // timestamp.proto) are well-known types that live inside libprotobuf, so no google/* code is
-// generated into api/ and none is listed here.
+// generated into api/ and none appears in the derived list.
 const std::vector<std::string> kProtoFileNames = {
-    "ondewo/sip/sip.proto",
+#include "proto_file_names.inc"
 };
 
 const std::vector<std::string> kServiceFullNames = {
